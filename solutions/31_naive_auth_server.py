@@ -13,6 +13,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
     log,
     scrypt,
@@ -20,7 +21,7 @@ from issp import (
 
 
 class Server(BankServer):
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         user = msg["user"]
 
         if user in self.db:
@@ -33,7 +34,7 @@ class Server(BankServer):
         }
         return True
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         if (record := self.db.get(msg["user"])) is None:
             return False
         return scrypt(msg["password"], salt=record["salt"]) == record["password"]

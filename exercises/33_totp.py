@@ -17,6 +17,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
     log,
 )
@@ -32,11 +33,11 @@ class TOTP:
 
 
 class Server(BankServer):
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         # Implement.
         return False
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         # Implement.
         return False
 

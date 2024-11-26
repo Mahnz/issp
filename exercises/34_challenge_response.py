@@ -13,6 +13,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
 )
 
@@ -22,15 +23,15 @@ class Server(BankServer):
         super().__init__(name, quiet=quiet)
         self.handlers["request_transaction"] = self.send_challenge
 
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         # Implement.
         return False
 
-    def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
+    def send_challenge(self, msg: JSONMessage) -> JSONMessage:
         # Implement by returning the challenge and stored salt.
         return {"challenge": None, "salt": None}
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         # Implement.
         return False
 

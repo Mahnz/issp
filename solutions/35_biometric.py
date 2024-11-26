@@ -19,6 +19,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
     biometric_template,
     log,
@@ -41,7 +42,7 @@ class Server(BankServer):
         self.handlers["request_transaction"] = self.send_challenge
         self.handlers["identify"] = self.identify
 
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         user = msg["user"]
 
         if user in self.db:
@@ -53,19 +54,19 @@ class Server(BankServer):
         }
         return True
 
-    def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
+    def send_challenge(self, msg: JSONMessage) -> JSONMessage:
         record = self.db[msg["user"]]
         record["challenge"] = os.urandom(16)
         return {"challenge": record["challenge"]}
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         if (record := self.db.get(msg["user"])) is None:
             return False
         if record.pop("challenge") != msg["token"]:
             return False
         return similarity(record["template"], msg["template"]) >= self.THRESHOLD
 
-    def identify(self, msg: dict[str, str | bytes]) -> dict:
+    def identify(self, msg: JSONMessage) -> JSONMessage:
         template = msg["template"]
         matched = None
         for user, record in self.db.items():

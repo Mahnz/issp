@@ -17,6 +17,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
     hmac_sha1,
     log,
@@ -39,7 +40,7 @@ class TOTP:
 
 
 class Server(BankServer):
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         user = msg["user"]
 
         if user in self.db:
@@ -53,7 +54,7 @@ class Server(BankServer):
         }
         return True
 
-    def _authenticate_vulnerable(self, msg: dict[str, str | bytes]) -> bool:
+    def _authenticate_vulnerable(self, msg: JSONMessage) -> bool:
         if (record := self.db.get(msg["user"])) is None:
             return False
 
@@ -65,7 +66,7 @@ class Server(BankServer):
         otp: TOTP = record["otp"]
         return otp.get_otp() == int(msg["otp"])
 
-    def _authenticate_secure(self, msg: dict[str, str | bytes]) -> bool:
+    def _authenticate_secure(self, msg: JSONMessage) -> bool:
         if (record := self.db.get(msg["user"])) is None:
             return False
 
@@ -83,7 +84,7 @@ class Server(BankServer):
         record["last_otp"] = received_otp
         return True
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         return self._authenticate_secure(msg)
 
 

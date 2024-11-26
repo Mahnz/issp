@@ -3,8 +3,14 @@ from __future__ import annotations
 import base64
 import json
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from . import _log as log
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+type JSONMessage = dict[str, str | bytes]
 
 
 class Layer(ABC):
@@ -119,37 +125,45 @@ class Actor:
             log.info("%s " + fmt, self.name, *args)
 
 
-class BankServer(Actor, ABC):
-    @abstractmethod
-    def register(self, msg: dict[str, str | bytes]) -> bool:
-        pass
-
-    @abstractmethod
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        pass
-
+class Server(Actor):
     def __init__(self, name: str, *, quiet: bool = False) -> None:
         super().__init__(name, quiet=quiet)
-        self.db: dict[str, dict] = {}
-        self.handlers = {
-            "register": self._register,
-            "perform_transaction": self._perform_transaction,
-        }
+        self.handlers: dict[str, Callable[[JSONMessage], JSONMessage]] = {}
 
     def handle_request(self, channel: Channel) -> None:
         action = None
         try:
             msg = self.receive(channel)
             action = msg["action"]
-            response = self.handlers[action](msg)
-        except Exception:
+            response = self._handle_message(action, msg)
+        except Exception as e:
+            log.error("Error handling request: %s", str(e))
             response = {"status": "invalid request"}
         self.send(channel, {"action": action} | response if action else response)
 
-    def _register(self, msg: dict) -> dict:
+    def _handle_message(self, action: str, msg: JSONMessage) -> JSONMessage:
+        return self.handlers[action](msg)
+
+
+class BankServer(Server, ABC):
+    @abstractmethod
+    def register(self, msg: JSONMessage) -> bool:
+        pass
+
+    @abstractmethod
+    def authenticate(self, msg: JSONMessage) -> bool:
+        pass
+
+    def __init__(self, name: str, *, quiet: bool = False) -> None:
+        super().__init__(name, quiet=quiet)
+        self.db: dict[str, dict] = {}
+        self.handlers["register"] = self._register
+        self.handlers["perform_transaction"] = self._perform_transaction
+
+    def _register(self, msg: JSONMessage) -> JSONMessage:
         return {"status": "success" if self.register(msg) else "failure"}
 
-    def _perform_transaction(self, msg: dict) -> dict:
+    def _perform_transaction(self, msg: JSONMessage) -> JSONMessage:
         if not self.authenticate(msg):
             return {"status": "authentication failure"}
 

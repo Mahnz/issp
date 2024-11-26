@@ -18,6 +18,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
     biometric_template,
 )
@@ -29,19 +30,19 @@ class Server(BankServer):
         self.handlers["request_transaction"] = self.send_challenge
         self.handlers["identify"] = self.identify
 
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         # Implement.
         return False
 
-    def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
+    def send_challenge(self, msg: JSONMessage) -> JSONMessage:
         # Implement by returning the challenge.
         return {"challenge": None}
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         # Implement.
         return False
 
-    def identify(self, msg: dict[str, str | bytes]) -> dict:
+    def identify(self, msg: JSONMessage) -> JSONMessage:
         # Implement by returning the user that matches the received biometric template.
         matched = None
         return {"status": "success", "user": matched} if matched else {"status": "no match"}

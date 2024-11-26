@@ -14,6 +14,7 @@ from issp import (
     BankServer,
     Channel,
     EncryptionLayer,
+    JSONMessage,
     RSASigner,
     log,
     scrypt,
@@ -25,7 +26,7 @@ class Server(BankServer):
         super().__init__(name, quiet=quiet)
         self.handlers["request_transaction"] = self.send_challenge
 
-    def register(self, msg: dict[str, str | bytes]) -> bool:
+    def register(self, msg: JSONMessage) -> bool:
         user = msg["user"]
 
         if user in self.db:
@@ -38,12 +39,12 @@ class Server(BankServer):
         }
         return True
 
-    def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
+    def send_challenge(self, msg: JSONMessage) -> JSONMessage:
         record = self.db[msg["user"]]
         record["challenge"] = os.urandom(16)
         return {"challenge": record["challenge"], "salt": record["salt"]}
 
-    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+    def authenticate(self, msg: JSONMessage) -> bool:
         if (record := self.db.get(msg["user"])) is None:
             return False
         return scrypt(record.pop("challenge") + record["password"]) == msg["token"]
