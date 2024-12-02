@@ -17,6 +17,7 @@ from ._communication import (
     AntiReplayLayer,
     BankServer,
     Channel,
+    FileServer,
     JSONMessage,
     Layer,
 )
@@ -67,6 +68,7 @@ __all__ = [
     "DigitalEnvelope",
     "EncryptedHashMAC",
     "EncryptionLayer",
+    "FileServer",
     "JSONMessage",
     "KeyedHashMAC",
     "Layer",

@@ -101,6 +101,12 @@ class Actor:
         self.name = name
         self.quiet = quiet
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.name!r})"
+
+    def __str__(self) -> str:
+        return self.name
+
     def send(self, layer: Layer, msg: bytes | object) -> None:
         try:
             layer.send(_try_encode(msg))
@@ -130,16 +136,22 @@ class Server(Actor):
         super().__init__(name, quiet=quiet)
         self.handlers: dict[str, Callable[[JSONMessage], JSONMessage]] = {}
 
-    def handle_request(self, channel: Channel) -> None:
+    def handle_request(self, channel: Channel) -> JSONMessage:
         action = None
+        msg = self.receive(channel)
         try:
-            msg = self.receive(channel)
             action = msg["action"]
             response = self._handle_message(action, msg)
         except Exception as e:
             log.error("Error handling request: %s", str(e))
-            response = {"status": "invalid request"}
-        self.send(channel, {"action": action} | response if action else response)
+            response = {"status": "error"}
+        response = {"action": action} | response if action else response
+        self.send(channel, response)
+        return response
+
+    def exchange(self, channel: Channel, client: Actor, msg: JSONMessage) -> JSONMessage:
+        client.send(channel, msg)
+        return self.handle_request(channel)
 
     def _handle_message(self, action: str, msg: JSONMessage) -> JSONMessage:
         return self.handlers[action](msg)
@@ -182,6 +194,42 @@ class BankServer(Server, ABC):
         log.info("Current balances: %s", {k: v["balance"] for k, v in self.db.items()})
 
         return {"status": "success", "user": user, "recipient": recipient, "amount": amount}
+
+
+class FileServer(Server, ABC):
+    @abstractmethod
+    def authorize(self, user: str, file: str, action: str) -> bool:
+        pass
+
+    def __init__(self, name: str, *, quiet: bool = False) -> None:
+        super().__init__(name, quiet=quiet)
+        self.file_data: dict[str, bytes] = {}
+        self.handlers["read"] = self._read
+        self.handlers["write"] = self._write
+
+    def _handle_message(self, action: str, msg: JSONMessage) -> JSONMessage:
+        if not self.authorize(msg.get("user"), msg.get("path"), action):
+            return {"status": "authorization failure"}
+        return super()._handle_message(action, msg)
+
+    def _read(self, msg: JSONMessage) -> JSONMessage:
+        if (data := self.file_data.get(msg["path"])) is None:
+            return {"status": "file not found"}
+        return {"status": "success", "data": data}
+
+    def _write(self, msg: JSONMessage) -> JSONMessage:
+        data = msg["data"]
+        path = msg["path"]
+
+        if not isinstance(data, bytes):
+            data = data.encode()
+
+        if msg.get("overwrite", "false") == "true":
+            self.file_data[path] = data
+        else:
+            self.file_data[path] = self.file_data.get(path, b"") + data
+
+        return {"status": "success"}
 
 
 def _preprocess_bytes(obj: object) -> object:
