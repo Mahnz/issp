@@ -43,11 +43,13 @@ def main() -> None:
     users = (alice, bob, carl)
     paths = ("file_a.txt", "file_b.txt", "file_c.txt")
 
+    # At this point, only the owner should be able to read the file.
     for user, path in itertools.product(users, paths):
         log.info("--- %s reads %s ---", user.name, path)
         message = {"user": user.name, "action": "read", "path": path}
         server.exchange(channel, user, message)
 
+    # At this point, only the owner should be able to write to the file.
     for user, path in itertools.product(users, paths):
         log.info("--- %s writes %s ---", user.name, path)
         message = {
@@ -58,6 +60,7 @@ def main() -> None:
         }
         server.exchange(channel, user, message)
 
+    # Alice should be able to grant write access to Bob over file_a.txt only.
     for path in paths:
         log.info("--- %s gives write access over %s to %s ---", alice.name, path, bob.name)
         message = {
@@ -71,6 +74,7 @@ def main() -> None:
 
     path = "file_a.txt"
 
+    # Alice should be able to grant read access over file_a.txt.
     log.info("--- %s gives read access over %s to %s ---", alice.name, path, carl.name)
     message = {
         "user": alice.name,
@@ -81,6 +85,7 @@ def main() -> None:
     }
     server.exchange(channel, alice, message)
 
+    # Bob should be able to write to file_a.txt.
     log.info("--- %s writes %s ---", bob.name, path)
     message = {
         "user": bob.name,
@@ -90,6 +95,7 @@ def main() -> None:
     }
     server.exchange(channel, bob, message)
 
+    # Carl should be able to read from file_a.txt.
     log.info("--- %s reads %s ---", carl.name, path)
     message = {
         "user": carl.name,

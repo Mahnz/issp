@@ -1,4 +1,5 @@
-# Implement a basic Role-Based Access Control (RBAC) scheme. Directives:
+# Implement a Role-Based Access Control (RBAC) scheme with role hierarchies and prerequisite roles.
+# Directives:
 #
 # - Assume that all users are already authenticated.
 # - The scheme should support the concept of roles, role assignments, and sessions.
@@ -7,20 +8,45 @@
 # - Roles are as follows:
 #   - "reader" can read the log file.
 #   - "writer" can write to the log file.
-#   - "admin" can assign and unassign any role.
+#   - "editor" inherits from "reader" and "writer" and has no additional rights.
+#   - "admin" inherits from "editor", and can assign and unassign any role.
+# - The rule on role prerequisites is as follows:
+#   - A role can only be assigned if all of its parent roles are already assigned to the user.
+#   - A role can only be unassigned if the user has none of its child roles assigned.
 # - Initial role assignments are as follows:
-#   - Admin: admin, writer, reader
-#   - Service A: writer, reader
+#   - Admin: admin, editor, writer, reader
+#   - Service A: writer
 #   - Service B: reader
 # - Make sure to implement reasonable defaults.
+#
+# Hint: start from the implementation of the previous exercise and add the necessary new features.
+
+from __future__ import annotations
 
 from issp import Actor, Channel, FileServer, JSONMessage, log
 
 
 class Role:
-    def __init__(self, name: str, rights: set[str]) -> None:
+    @property
+    def rights(self) -> set[str]:
+        rights = set(self.own_rights)
+        for parent in self.parents:
+            rights |= parent.rights
+        return rights
+
+    def __init__(
+        self,
+        name: str,
+        rights: set[str] | None = None,
+        parents: set[Role] | None = None,
+    ) -> None:
         self.name = name
-        self.rights = rights
+        self.own_rights = rights or set()
+        self.parents = parents or set()
+        self.children: set[Role] = set()
+
+        for parent in self.parents:
+            parent.children.add(self)
 
 
 class Server(FileServer):
@@ -66,14 +92,55 @@ def main() -> None:
     # Session creation.
 
     for client, roles in (
-        (admin, ["admin", "writer", "reader"]),  # This should succeed.
-        (service_a, ["writer", "reader"]),  # This should succeed.
-        (service_b, ["writer", "reader"]),  # This should fail.
+        (admin, ["admin"]),  # This should succeed.
+        (service_a, ["editor"]),  # This should fail.
+        (service_a, ["writer"]),  # This should succeed.
         (service_b, ["reader"]),  # This should succeed.
     ):
         log.info("--- %s creates session ---", client)
         message = {"action": "start_session", "user": client.name, "roles": roles}
         server.exchange(channel, client, message)
+
+    # Role assignment.
+
+    # Only Admin should be able to assign roles, though in this case
+    # role assignment should fail due to a prerequisite failure.
+    for client in (service_a, admin):
+        log.info("--- %s assigns role ---", client)
+        message = {
+            "action": "assign_role",
+            "user": client.name,
+            "target": service_b.name,
+            "role": "editor",
+        }
+        server.exchange(channel, client, message)
+
+    # The following role assignments should succeed.
+    for role in ("writer", "editor"):
+        log.info("--- %s assigns role ---", admin)
+        message = {
+            "action": "assign_role",
+            "user": admin.name,
+            "target": service_b.name,
+            "role": role,
+        }
+        server.exchange(channel, admin, message)
+
+    # Drop privileges.
+
+    log.info("--- %s starts session ---", admin)
+    message = {"action": "start_session", "user": admin.name, "roles": ["editor"]}
+    server.exchange(channel, admin, message)
+
+    # The following role assignment should fail.
+    log.info("--- %s assigns role ---", admin)
+    message = {
+        "action": "assign_role",
+        "user": admin.name,
+        "target": service_a.name,
+        "role": "editor",
+    }
+    server.exchange(channel, admin, message)
 
     # Read and write operations.
     # These should respect session roles.
@@ -95,40 +162,6 @@ def main() -> None:
         log.info("--- %s reads ---", client)
         message = {"user": client.name, "action": "read", "path": path}
         server.exchange(channel, client, message)
-
-    # Role assignment.
-
-    # Only Admin should be able to assign roles.
-    for client in (service_a, admin):
-        log.info("--- %s assigns role ---", client)
-        message = {
-            "action": "assign_role",
-            "user": client.name,
-            "target": service_b.name,
-            "role": "writer",
-        }
-        server.exchange(channel, client, message)
-
-    # Check if Service B can read / write.
-
-    log.info("--- %s creates session ---", service_b.name)
-    message = {"action": "start_session", "user": service_b.name, "roles": ["writer"]}
-    server.exchange(channel, service_b, message)
-
-    # Service B should be able to write during this session.
-    log.info("--- %s writes ---", service_b)
-    message = {
-        "user": service_b.name,
-        "action": "write",
-        "data": f" Written by {service_b}.",
-        "path": path,
-    }
-    server.exchange(channel, service_b, message)
-
-    # Service B should not be able to read during this session.
-    log.info("--- %s reads ---", service_b.name)
-    message = {"user": service_b.name, "action": "read", "path": path}
-    server.exchange(channel, service_b, message)
 
 
 if __name__ == "__main__":
