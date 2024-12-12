@@ -27,14 +27,31 @@ from issp import Actor, Channel, FileServer, JSONMessage, log
 
 
 class Role:
-    # Modify the class to support role hierarchies.
-    # Hint: if you are smart about it, you can keep the authorization logic identical
-    #       to the previous exercise. Remember that the rights of a role, when role
-    #       hierarchies are involved, are the union of its own rights and the rights
-    #       of all its parent roles, recursively.
-    def __init__(self, name: str, rights: set[str] | None = None) -> None:
+    @property
+    def rights(self) -> set[str]:
+        return self.own_rights.union(*(parent.rights for parent in self.own_parents))
+
+    @property
+    def parents(self) -> set[Role]:
+        return self.own_parents.union(*(parent.own_parents for parent in self.own_parents))
+
+    @property
+    def children(self) -> set[Role]:
+        return self.own_children.union(*(child.own_children for child in self.own_children))
+
+    def __init__(
+        self,
+        name: str,
+        rights: set[str] | None = None,
+        parents: set[Role] | None = None,
+    ) -> None:
         self.name = name
-        self.rights = rights or set()
+        self.own_rights = rights or set()
+        self.own_parents = parents or set()
+        self.own_children: set[Role] = set()
+
+        for parent in self.parents:
+            parent.children.add(self)
 
 
 class Server(FileServer):
@@ -47,26 +64,61 @@ class Server(FileServer):
 
         self.file_data["logfile.txt"] = b"This is the log file."
 
-        # Add any necessary state.
+        reader = Role("reader", rights={"read"})
+        writer = Role("writer", rights={"write"})
+        editor = Role("editor", parents={reader, writer})
+        admin = Role("admin", rights={"assign_role", "unassign_role"}, parents={editor})
+        self.roles = {r.name: r for r in (reader, writer, editor, admin)}
+
+        self.role_assignments: dict[str, set[Role]] = {
+            "Admin": {admin, editor, writer, reader},
+            "Service A": {writer},
+            "Service B": {reader},
+        }
+
+        self.sessions: dict[str, set[Role]] = {}
 
     def authorize(self, user: str, file: str, action: str) -> bool:
-        # Implement.
-        return False
+        del file  # Unused.
+        if action in ("start_session", "end_session"):
+            # Everyone is allowed to start and end sessions.
+            return True
+        # Check if the user has the required permission for the action.
+        return any(action in role.rights for role in self.sessions.get(user, ()))
 
     def start_session(self, msg: JSONMessage) -> JSONMessage:
-        # Implement.
+        user = msg["user"]
+        activated_roles = {self.roles[role] for role in msg["roles"]}
+        user_roles = self.role_assignments.get(user, set())
+        if not activated_roles.issubset(user_roles):
+            return {"status": "authorization failure"}
+        self.sessions[user] = activated_roles
         return {"status": "success"}
 
     def end_session(self, msg: JSONMessage) -> JSONMessage:
-        # Implement.
+        self.sessions.pop(msg["user"], None)
         return {"status": "success"}
 
     def assign_role(self, msg: JSONMessage) -> JSONMessage:
-        # Implement.
+        role = self.roles[msg["role"]]
+        target = msg["target"]
+
+        target_roles = self.role_assignments.get(target, set())
+        if not role.parents.issubset(target_roles):
+            return {"status": "prerequisite failure"}
+
+        self.role_assignments[target].add(role)
         return {"status": "success"}
 
     def unassign_role(self, msg: JSONMessage) -> JSONMessage:
-        # Implement.
+        role = self.roles[msg["role"]]
+        target = msg["target"]
+
+        target_roles = self.role_assignments.get(target, set())
+        if not role.children.isdisjoint(target_roles):
+            return {"status": "prerequisite failure"}
+
+        self.role_assignments[target].remove(role)
         return {"status": "success"}
 
 
