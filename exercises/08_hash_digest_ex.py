@@ -3,14 +3,16 @@
 
 
 from issp import Actor, AuthenticationLayer, Authenticator, Channel
+from cryptography.hazmat.primitives import hashes
 
 
 class SHA256(Authenticator):
     size = 32
 
     def compute_code(self, message: bytes) -> bytes:
-        # Implement digest computation here.
-        return b""
+        digest = hashes.Hash(hashes.SHA256())
+        digest.update(message)
+        return digest.finalize()
 
 
 def main() -> None:

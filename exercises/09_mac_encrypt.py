@@ -12,13 +12,19 @@ class SHA256AES(Authenticator):
         self._sha = SHA256()
 
     def compute_code(self, message: bytes) -> bytes:
-        # Implement.
-        return b""
+        iv = os.urandom(self._aes.iv_size)
+        digest = self._sha.compute_code(message)
+        return iv + self._aes.encrypt(digest, iv)
 
-    def verify(self, message: bytes, code: bytes) -> bool:
+    def verify(self, message: bytes, fingerprint: bytes) -> bool:
         # The default implementation of the check method is insufficient.
         # We need to decrypt the code first, then perform the check.
-        return False
+
+        iv = fingerprint[:self._aes.iv_size]
+        code = fingerprint[self._aes.iv_size:]
+
+        code_decrypted = self._aes.decrypt(code, iv)
+        return self._sha.verify(message, code_decrypted)
 
 
 def main() -> None:

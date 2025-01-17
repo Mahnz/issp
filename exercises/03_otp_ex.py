@@ -3,7 +3,7 @@
 
 import os
 
-from issp import Actor, Channel, log
+from issp import Actor, Channel, log, SymmetricCipher, EncryptionLayer
 
 
 def xor(data: bytes, key: bytes) -> bytes:
@@ -14,22 +14,28 @@ def xor(data: bytes, key: bytes) -> bytes:
     return bytes(data[i] ^ key[i] for i in range(length))
 
 
+class OTP(SymmetricCipher):
+    def encrypt(self, data: bytes) -> bytes:
+        return xor(data, self.key)
+
+    def decrypt(self, data: bytes) -> bytes:
+        return xor(data, self.key)
+
+
 def main() -> None:
     alice = Actor("Alice")
     bob = Actor("Bob")
-    mallory = Actor("Mallory", quiet=False)
-    channel = Channel()
-
-    key = os.urandom(256)
     message = b"Hello, Bob! - Alice"
-    log.info("Alice wants to send: %s", message)
-    message = xor(message, key)
-    alice.send(channel, message)
+
+    mallory = Actor("Mallory", quiet=False)
+
+    channel = Channel()
+    alice_bob_layer = EncryptionLayer(channel, OTP(os.urandom(256)))
+
+    alice.send(alice_bob_layer, message)
 
     mallory.receive(channel)
-    message = bob.receive(channel)
-    message = xor(message, key)
-    log.info("Bob decrypted: %s", message)
+    bob.receive(channel)
 
 
 if __name__ == "__main__":

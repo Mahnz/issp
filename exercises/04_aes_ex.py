@@ -2,8 +2,11 @@
 # from the issp module.
 
 import os
+from email.utils import decode_rfc2231
 
 from issp import Actor, Channel, EncryptionLayer, SymmetricCipher
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 
 class AES(SymmetricCipher):
@@ -11,11 +14,18 @@ class AES(SymmetricCipher):
 
     def encrypt(self, message: bytes, iv: bytes | None) -> bytes:
         # Implement encryption here.
-        return message
+
+        encryptor = Cipher(algorithms.AES(self.key), modes.CBC(iv)).encryptor()
+        padder = padding.PKCS7(self.iv_size * 8).padder()
+        message = padder.update(message) + padder.finalize()
+        return encryptor.update(message) + encryptor.finalize()
 
     def decrypt(self, message: bytes, iv: bytes | None) -> bytes:
         # Implement decryption here.
-        return message
+        decryptor = Cipher(algorithms.AES(self.key), modes.CBC(iv)).decryptor()
+        unpadder = padding.PKCS7(self.iv_size * 8).unpadder()
+        message = decryptor.update(message) + decryptor.finalize()
+        return unpadder.update(message) + unpadder.finalize()
 
 
 def main() -> None:

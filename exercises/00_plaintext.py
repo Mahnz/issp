@@ -9,6 +9,11 @@ def main() -> None:
     channel = Channel()
 
     alice.send(channel, b"Hello, Bob! - Alice")
+
+    mallory = Actor("Mallory", quiet=False)
+    mallory.receive(channel)
+    mallory.send(channel, b"Kill yourself, Bob!")
+
     bob.receive(channel)
 
 
