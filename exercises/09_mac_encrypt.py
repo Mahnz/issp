@@ -17,8 +17,6 @@ class SHA256AES(Authenticator):
         return iv + self._aes.encrypt(digest, iv)
 
     def verify(self, message: bytes, fingerprint: bytes) -> bool:
-        # The default implementation of the check method is insufficient.
-        # We need to decrypt the code first, then perform the check.
 
         iv = fingerprint[:self._aes.iv_size]
         code = fingerprint[self._aes.iv_size:]
@@ -38,10 +36,14 @@ def main() -> None:
     mallory.receive(channel)
     bob.receive(alice_bob_layer)
 
+    print()
+
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     message = mallory.receive(channel)
     mallory.send(channel, message[7:])
     bob.receive(alice_bob_layer)
+
+    print()
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)

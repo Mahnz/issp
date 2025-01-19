@@ -4,7 +4,7 @@
 #
 # Hint: The certificate should contain Bob's public key and his name.
 
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from issp import Actor, Channel, log
@@ -30,15 +30,37 @@ def main() -> None:
 
     # Prepare a CSR (unsigned certificate), sign it with the CA's private key, and send it to Alice.
     bob_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    # ...
+    bob_unsigned_crt = (
+            bob_private_key.public_key().public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            + bob.name.encode()
+    )
 
-    # Verify that the received certificate is signed by the CA.
-    # ...
+    ca_signature = ca_private_key.sign(bob_unsigned_crt, pss_padding, hash_func)
+    bob_signed_crt = bob_unsigned_crt + ca_signature
 
-    # Extract the public key from the certificate and use it to encrypt and send a message to Bob.
-    # ...
+    # BOB - Sends his certificate to ALICE
+    bob.send(channel, bob_signed_crt)
 
-    # Bob receives Alice's message and decrypts it.
+    # mallory.receive(channel)
+
+    # ALICE - Receives BOB's certificate
+    certificate_rcv = alice.receive(channel)
+    ca_signature_rcv = certificate_rcv[-ca_public_key.key_size // 8:]
+    certificate_rcv = certificate_rcv[:-ca_public_key.key_size // 8]
+
+    # Verify that the received certificate is signed by the CA
+    ca_public_key.verify(ca_signature_rcv, certificate_rcv, pss_padding, hash_func)
+
+    # ALICE extracts BOB's public key from the certificate
+    bob_public_key = serialization.load_pem_public_key(certificate_rcv)
+    alice.send(channel, bob_public_key.encrypt(
+        b"I received the certificate. All good!", oaep_padding
+    ))
+
+    # BOB - Receives ALICE's message and decrypts it
     received_message = bob.receive(channel)
     log.info("Bob decrypted: %s", bob_private_key.decrypt(received_message, oaep_padding))
 

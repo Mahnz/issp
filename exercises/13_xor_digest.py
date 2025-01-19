@@ -2,13 +2,21 @@
 #
 # Hint: you can use the xor and zero_pad functions from the issp module.
 
-from issp import Actor, AuthenticationLayer, Authenticator, Channel
+from issp import Actor, AuthenticationLayer, Authenticator, Channel, log, xor, zero_pad
 
 
 class XOR(Authenticator):
     def compute_code(self, message: bytes) -> bytes:
         # Implement
-        return b""
+
+        digest_size = 8  # bytes
+        message = zero_pad(message, digest_size)
+
+        digest = bytes(digest_size)
+        for i in range(0, len(message), digest_size):
+            digest = xor(digest, message[i : i + digest_size])
+
+        return digest
 
 
 def main() -> None:

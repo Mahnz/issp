@@ -9,13 +9,19 @@ from issp import AES, RNG, Actor, Channel, EncryptionLayer, log
 
 
 class CounterRNG(RNG):
+    def __init__(self) -> None:
+        self._counter = 0
+        self._cipher = AES()
+        self._cipher.apply_padding = False
+
     def set_seed(self, seed: bytes) -> None:
         # Implement.
-        pass
+        self._cipher.key = seed
 
     def next_value(self) -> bytes:
         # Implement.
-        pass
+        self._counter += 1
+        return self._cipher.encrypt(self._counter.to_bytes(self._cipher.block_size))
 
 
 def main() -> None:

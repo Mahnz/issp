@@ -3,6 +3,8 @@
 
 import os
 
+from cryptography.hazmat.primitives import hashes
+
 from issp import Actor, AuthenticationLayer, Authenticator, Channel
 
 
@@ -12,7 +14,10 @@ class KeyedSHA256(Authenticator):
 
     def compute_code(self, message: bytes) -> bytes:
         # Implement.
-        return b""
+        digest = hashes.Hash(hashes.SHA256())
+        digest.update(self._key + message + self._key)
+
+        return digest.finalize()
 
 
 def main() -> None:
@@ -26,10 +31,14 @@ def main() -> None:
     mallory.receive(channel)
     bob.receive(alice_bob_layer)
 
+    print()
+
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     message = mallory.receive(channel)
     mallory.send(channel, message[7:])
     bob.receive(alice_bob_layer)
+
+    print()
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)

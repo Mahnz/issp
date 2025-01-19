@@ -4,17 +4,7 @@
 #
 # Hint: You can use the DigitalEnvelope and RSASigner classes from the issp library.
 
-from issp import (
-    AES,
-    RSA,
-    Actor,
-    AuthenticationLayer,
-    Channel,
-    DigitalEnvelope,
-    EncryptionLayer,
-    RSASigner,
-    log,
-)
+from issp import AES, RSA, Actor, AuthenticationLayer, Channel, DigitalEnvelope, EncryptionLayer, RSASigner, log
 
 
 def main() -> None:

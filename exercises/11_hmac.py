@@ -3,10 +3,11 @@
 #
 # Hint: Have a look at the cryprography.hazmat.primitives.hmac module.
 # Docs: https://cryptography.io/en/latest/hazmat/primitives/mac/hmac
-
+import hmac
 import os
 
 from issp import Actor, AuthenticationLayer, Authenticator, Channel
+from cryptography.hazmat.primitives import hashes, hmac
 
 
 class HMAC(Authenticator):
@@ -15,7 +16,9 @@ class HMAC(Authenticator):
 
     def compute_code(self, message: bytes) -> bytes:
         # Implement.
-        return b""
+        mac = hmac.HMAC(self._key, hashes.SHA256())
+        mac.update(message)
+        return mac.finalize()
 
 
 def main() -> None:
@@ -29,10 +32,14 @@ def main() -> None:
     mallory.receive(channel)
     bob.receive(alice_bob_layer)
 
+    print()
+
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     message = mallory.receive(channel)
     mallory.send(channel, message[7:])
     bob.receive(alice_bob_layer)
+
+    print()
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)

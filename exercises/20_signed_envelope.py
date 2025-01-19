@@ -5,7 +5,7 @@
 # Hint: You can use the DigitalEnvelope and RSASigner classes from the issp library.
 
 
-from issp import Actor, Channel
+from issp import Actor, Channel, DigitalEnvelope, RSASigner, AuthenticationLayer, EncryptionLayer, AES, RSA
 
 
 def main() -> None:
@@ -14,9 +14,28 @@ def main() -> None:
     mallory = Actor("Mallory", quiet=False)
     channel = Channel()
 
-    alice.send(channel, b"Hello, Bob! - Alice")
+    auth_layer = AuthenticationLayer(channel, RSASigner())
+    enc_layer = EncryptionLayer(auth_layer, DigitalEnvelope(
+        message_cipher=AES(),
+        key_cipher=RSA()
+    ))
+
+    # ALICE - Sends the message
+    alice.send(enc_layer, b"Hello, Bob! - Alice")
+
+    print()
+
+    # MALLORY - Tamper the message
     mallory.receive(channel)
-    bob.receive(channel)
+    print()
+    mallory.send(channel, bytes(8) + mallory.receive(channel)[8:])
+
+    print()
+
+    # BOB - Receives the encrypted message
+    bob.receive(enc_layer)
+
+    print()
 
 
 if __name__ == "__main__":

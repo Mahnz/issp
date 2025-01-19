@@ -1,10 +1,10 @@
 # Help Mallory perform a brute-force attack on the MAC key used by Alice and Bob.
 #
 # Hint: Have a look at the itertools.product function.
-
 import os
+from itertools import product
 
-from issp import HMAC, Actor, AuthenticationLayer, Channel
+from issp import HMAC, Actor, AuthenticationLayer, Channel, log
 
 
 def main() -> None:
@@ -24,7 +24,17 @@ def main() -> None:
     message = message[: -digest.code_size]
 
     found_key = b""
+
     # Find the key through brute-force.
+    for _try in product(range(256), repeat=digest.code_size):
+        found_key = bytes(_try)
+
+        if HMAC(found_key).verify(message, mac):
+            log.info("I'VE FOUND YOU!")
+            break
+        else:
+            log.info("Not this time, MF!")
+
 
     mallory_layer = AuthenticationLayer(channel, HMAC(found_key))
     mallory.send(mallory_layer, b"#!%* you, Bob! - Alice")

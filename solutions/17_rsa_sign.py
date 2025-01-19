@@ -17,8 +17,10 @@ def main() -> None:
     mallory = Actor("Mallory", quiet=False)
     channel = Channel()
 
-    hash_func = hashes.SHA256()
-    rsa_padding = padding.PSS(mgf=padding.MGF1(hash_func), salt_length=padding.PSS.MAX_LENGTH)
+    rsa_padding = padding.PSS(
+        mgf=padding.MGF1(hashes.SHA256()),
+        salt_length=padding.PSS.MAX_LENGTH
+    )
 
     # Alice generates a public/private key pair. The public key is shared with all participants.
     # Note: for RSA, the key size is equal to the size of the signature.
@@ -28,7 +30,7 @@ def main() -> None:
 
     # Alice signs the message using her private key.
     message = b"Hello, Bob! - Alice"
-    signature = alice_private_key.sign(message, rsa_padding, hash_func)
+    signature = alice_private_key.sign(message, rsa_padding, hashes.SHA256())
 
     # Alice sends the message and its signature.
     alice.send(channel, message + signature)
@@ -38,13 +40,13 @@ def main() -> None:
 
     # Bob splits the received message into the plaintext and the signature.
     message = bob.receive(channel)
-    signature = message[-key_size // 8 :]
+    signature = message[-key_size // 8:]
     message = message[: -key_size // 8]
 
     # Bob verifies the signature using Alice's public key.
     log.info("Bob received: %s", message)
     try:
-        alice_public_key.verify(signature, message, rsa_padding, hash_func)
+        alice_public_key.verify(signature, message, rsa_padding, hashes.SHA256())
         log.info("Bob successfully verified the signature")
     except InvalidSignature:
         log.info("Signature verification failed")
