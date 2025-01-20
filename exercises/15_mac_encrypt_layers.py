@@ -6,7 +6,7 @@
 #       on the subsequent layer.
 
 
-from issp import Actor, Channel
+from issp import Actor, Channel, AuthenticationLayer, HMAC, EncryptionLayer, AES
 
 
 def main() -> None:
@@ -15,9 +15,17 @@ def main() -> None:
     mallory = Actor("Mallory", quiet=False)
     channel = Channel()
 
-    alice.send(channel, b"Hello, Bob! - Alice")
-    mallory.receive(channel)
-    bob.receive(channel)
+    auth_layer = AuthenticationLayer(channel, HMAC())
+    encrypt_layer = EncryptionLayer(auth_layer, AES())
+
+    alice.send(encrypt_layer, b"Hello, Bob! - Alice")
+    message = mallory.receive(channel)
+
+    message = message[8:]
+
+    mallory.send(channel, message)
+
+    bob.receive(encrypt_layer)
 
 
 if __name__ == "__main__":
